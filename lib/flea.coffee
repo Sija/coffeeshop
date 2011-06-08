@@ -104,32 +104,33 @@ Mongoose.model = (name, schema) ->
 
   model
 
-models = File.readdirSync __appdir + '/models'
-models = models.filter (filename) -> filename.match /\.js$/
-for model in models
-  do (model) ->
-    sandbox =
-      Mongoose: Mongoose
-      ObjectId: Mongoose.Schema.Types.ObjectId
+do ->
+  models = File.readdirSync __appdir + '/models'
+  models = models.filter (filename) -> filename.match /\.js$/
+  for model in models
+    do (model) ->
+      sandbox =
+        Mongoose: Mongoose
+        ObjectId: Mongoose.Schema.Types.ObjectId
 
-      depends_on: (models, callback) ->
-        models = [models] if not Array.isArray models
-        dependant =
-          on: RightJS.$A models
-          satisfied: []
-          callback: callback
-          loaded: no
-        dependant_models.push dependant
+        depends_on: (models, callback) ->
+          models = [models] if not Array.isArray models
+          dependant =
+            on: RightJS.$A models
+            satisfied: []
+            callback: callback
+            loaded: no
+          dependant_models.push dependant
 
-    loadAndRunInNewContext __appdir + '/models/' + model, sandbox
+      loadAndRunInNewContext __appdir + '/models/' + model, sandbox
 
-    schema_name = model.replace /\.js$/, ''
-    schema_name = schema_name.camelize().capitalize()
+      schema_name = model.replace /\.js$/, ''
+      schema_name = schema_name.camelize().capitalize()
 
-    if schema = sandbox[schema_name]
-      Mongoose.model schema_name, schema
-    else
-      console.warn 'Did not find model definition for "%s".', schema_name
+      if schema = sandbox[schema_name]
+        Mongoose.model schema_name, schema
+      else
+        console.warn 'Did not find model definition for "%s".', schema_name
 
 #
 # Setup express application
@@ -288,10 +289,11 @@ router_dsl =
 
     @
 
-for method in router_dsl.router.methods
-  do (method) ->
-    router_dsl[method] = (src, options = {}) ->
-      router_dsl.match src, Object.merge {}, options, via: method
+do ->
+  for method in router_dsl.router.methods
+    do (method) ->
+      router_dsl[method] = (src, options = {}) ->
+        router_dsl.match src, Object.merge {}, options, via: method
 
 do ->
   sandbox = Object.reverse_merge router_dsl,
@@ -303,12 +305,13 @@ do ->
 # Load controllers and register default routes
 #
 
-controllers = File.readdirSync __appdir + '/controllers'
-controllers = controllers.filter (filename) -> filename.match /\.js$/
-for name in controllers
-  do (name) ->
-    name = name.underscored().replace /_controller\.js$/, ''
-    router_dsl.match "/#{name}/:action?/:id?.:format?", to: name
+do ->
+  controllers = File.readdirSync __appdir + '/controllers'
+  controllers = controllers.filter (filename) -> filename.match /\.js$/
+  for name in controllers
+    do (name) ->
+      name = name.underscored().replace /_controller\.js$/, ''
+      router_dsl.match "/#{name}/:action?/:id?.:format?", to: name
 #
 # Register fallback route
 #
