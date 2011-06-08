@@ -14,6 +14,7 @@
     "rightjs":          ">= 2.2",
     "mongoose":         ">= 1.3.6",
     "mongoose-types":   ">= 1.0.3",
+    "coffee-script":    ">= 1.1",
     "haml":             ">= 0.4",
     "stylus":           ">= 0.13"
   },

@@ -5,6 +5,7 @@
 Express   = require 'express'
 Mongoose  = require 'mongoose'
 Haml      = require 'haml'
+Coffee    = require 'coffee-script'
 Stylus    = require 'stylus'
 File      = require 'fs'
 Path      = require 'path'
@@ -21,12 +22,11 @@ MongooseTypes.loadTypes Mongoose
 #
 
 __packagedir = Path.resolve __dirname, '..'
-__projectdir = Path.dirname require.main.filename
+__projectdir = process.cwd()
 __appdir = __projectdir + '/app'
 
 require.paths.unshift __packagedir
 require.paths.unshift __packagedir + '/lib'
-require.paths.unshift __projectdir
 
 #
 # Load our internal stuff
@@ -43,14 +43,37 @@ Object.defineProperty Object, 'merge',
 Object.defineProperty Object, 'reverse_merge',
   value: Utils.reverse_merge
 
+#
+# Miscellaneous helper functions
+#
+
+puts = console.log
 
 loadAndRunInNewContext = (filename, sandbox) ->
-  code = File.readFileSync filename, 'utf8'
-  sandbox = Object.merge sandbox,
-    require: require
-    console: console
+  run = (filename, sandbox) ->
+    code = File.readFileSync filename, 'utf8'
+    if filename.match /\.coffee$/
+      code = Coffee.compile code,
+        filename: filename
+        bare: yes
 
-  VM.runInNewContext code, sandbox, filename
+    sandbox = Object.merge sandbox,
+      require: require
+      console: console
+
+    VM.runInNewContext code, sandbox, filename
+
+  try
+    run filename, sandbox
+  catch error
+    throw error unless error.code is 'EBADF'
+
+    if filename.match /\.coffee$/
+      filename = filename.replace /\.coffee$/, '.js'
+    else
+      filename = filename.replace /\.js$/, '.coffee'
+
+    run filename, sandbox
 
 #
 # Load config values
@@ -59,7 +82,7 @@ loadAndRunInNewContext = (filename, sandbox) ->
 Config = {}
 do ->
   sandbox = {}
-  loadAndRunInNewContext __projectdir + '/config/config.js', sandbox
+  loadAndRunInNewContext __projectdir + '/config/config.coffee', sandbox
   Object.merge Config, sandbox.config
 
 #
@@ -106,7 +129,7 @@ Mongoose.model = (name, schema) ->
 
 do ->
   models = File.readdirSync __appdir + '/models'
-  models = models.filter (filename) -> filename.match /\.js$/
+  models = models.filter (filename) -> filename.match /\.(coffee|js)$/
   for model in models
     do (model) ->
       sandbox =
@@ -124,7 +147,7 @@ do ->
 
       loadAndRunInNewContext __appdir + '/models/' + model, sandbox
 
-      schema_name = model.replace /\.js$/, ''
+      schema_name = model.replace /\.(.+)$/, ''
       schema_name = schema_name.camelize().capitalize()
 
       if schema = sandbox[schema_name]
@@ -198,7 +221,7 @@ BaseController = require 'base_controller'
 ApplicationController = null
 do ->
   for path in [__appdir + '/controllers', __packagedir + '/lib']
-    path += '/application_controller.js'
+    path += '/application_controller.coffee'
 
     continue unless Path.existsSync path
     sandbox =
@@ -264,7 +287,7 @@ router_dsl =
             Mongoose: Mongoose
             ObjectId: Mongoose.Schema.Types.ObjectId
 
-          loadAndRunInNewContext "#{__appdir}/controllers/#{route.controller}_controller.js", sandbox
+          loadAndRunInNewContext "#{__appdir}/controllers/#{route.controller}_controller.coffee", sandbox
 
           ctrl_name = "#{route.controller.capitalize()}_controller".camelize()
           if not ctrl = sandbox[ctrl_name]
@@ -299,7 +322,7 @@ do ->
   sandbox = Object.reverse_merge router_dsl,
     app: app
 
-  loadAndRunInNewContext __projectdir + '/config/routes.js', sandbox
+  loadAndRunInNewContext __projectdir + '/config/routes.coffee', sandbox
 
 #
 # Load controllers and register default routes
@@ -307,11 +330,12 @@ do ->
 
 do ->
   controllers = File.readdirSync __appdir + '/controllers'
-  controllers = controllers.filter (filename) -> filename.match /\.js$/
+  controllers = controllers.filter (filename) -> filename.match /\.(coffee|js)$/
   for name in controllers
     do (name) ->
-      name = name.underscored().replace /_controller\.js$/, ''
+      name = name.underscored().replace /_controller\.(.+)$/, ''
       router_dsl.match "/#{name}/:action?/:id?.:format?", to: name
+
 #
 # Register fallback route
 #
