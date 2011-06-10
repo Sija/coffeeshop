@@ -192,11 +192,13 @@ class Flea
               ctrl.toString = -> route.controller
 
               if ctrl.before_filter()?
-                cb = req.params.action + 'Action'
-                unless typeof ctrl[cb] is 'function'
-                  next new Error "#{route.controller}##{req.params.action} is not a controller action!"
+                action = req.params.action
+                unless typeof ctrl[action] is 'function'
+                  next new Error "#{route.controller}##{action} is not a controller action!"
                 else
-                  ctrl[cb].call ctrl, req, res, next
+                  ctrl[action](req, res, next)
+                  ctrl.render() if ctrl.auto_render
+
                 ctrl.after_filter()
 
               delete ctrl
