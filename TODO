@@ -1,0 +1,7 @@
+* solid router implementation
+* postrender handlers
+* socket.io realtime messaging
+* CoffeeScript rendered clientside javascript
+* helpers
+* initializers / bootstrap
+

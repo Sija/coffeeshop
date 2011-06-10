@@ -1,5 +1,15 @@
+File    = require 'fs'
+VM      = require 'vm'
+Coffee  = require 'coffee-script'
+
+#
+# @api: public
+#
 utils = {}
 
+#
+# @api: public
+#
 utils.typeOf = (value) ->
   type = typeof value
   if type is 'object' or type is 'function'
@@ -15,6 +25,9 @@ utils.typeOf = (value) ->
       else          type
   type
 
+#
+# @api: public
+#
 utils.merge = (target, objects...) ->
   deep = yes
   if typeof target is 'boolean'
@@ -24,9 +37,7 @@ utils.merge = (target, objects...) ->
     [target, objects] = [this, [target]]
 
   isExtendable = (object) ->
-    typeof object is 'object' and object isnt null or
-    typeof object is 'function' or
-    Array.isArray(object)
+    !!object and not (typeof object in ['boolean', 'number', 'string'])
 
   target = {} unless isExtendable target
 
@@ -35,17 +46,20 @@ utils.merge = (target, objects...) ->
     for key, copy of object
       continue unless Object::hasOwnProperty.call object, key
 
-      if deep and isExtendable copy and target isnt copy
-        src = target[key]
-        if Array.isArray copy
-          clone = Array.isArray(src) and src or []
-          clone.push copy...
-          copy = clone
-        else
-          copy = arguments.callee deep, src, copy
+      if deep and target isnt copy and isExtendable copy
+        if src = target[key]
+          if Array.isArray copy
+            clone = Array.isArray(src) and src or []
+            clone.push copy...
+            copy = clone
+          else
+            copy = arguments.callee deep, src, copy
       target[key] = copy
   target
 
+#
+# @api: public
+#
 utils.reverse_merge = (objects...) ->
   return {} if not objects.length
 
@@ -53,6 +67,36 @@ utils.reverse_merge = (objects...) ->
     utils.merge objects.shift(), objects.reverse()...
   else
     utils.merge objects.reverse()...
+
+#
+# @api: public
+#
+utils.runFileInNewContext = (filename, sandbox) ->
+  run = (filename, sandbox) ->
+    code = File.readFileSync filename, 'utf8'
+    if filename.match /\.coffee$/
+      code = Coffee.compile code,
+        filename: filename
+        bare: yes
+
+    sandbox = utils.merge sandbox,
+      require: require
+      console: console
+
+    VM.runInNewContext code, sandbox, filename
+
+  try
+    run filename, sandbox
+
+  catch error
+    throw error unless error.code is 'EBADF'
+
+    if filename.match /\.coffee$/
+      filename = filename.replace /\.coffee$/, '.js'
+    else
+      filename = filename.replace /\.js$/, '.coffee'
+
+    run filename, sandbox
 
 module.exports = utils
 

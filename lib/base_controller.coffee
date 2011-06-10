@@ -17,6 +17,8 @@ class BaseController
     @request.param name, def
 
   render: (name, options) ->
+    [name, options] = [null, name] unless typeof name is 'string'
+
     name ||= @request.params.action.underscored()
     name = "#{@toString()}/#{name}" unless '/' in name
 
@@ -27,9 +29,10 @@ class BaseController
     @response.render name, options
 
   send: -> @response.send arguments...
+  redirect: -> @response.redirect arguments...
 
   before_filter: -> true
-  after_filter:  ->
+  after_filter: ->
 
 module.exports = BaseController
 
