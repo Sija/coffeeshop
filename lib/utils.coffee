@@ -12,17 +12,13 @@ utils = {}
 #
 utils.typeOf = (value) ->
   type = typeof value
-  if type is 'object' or type is 'function'
+  if type in ['object', 'function']
     return 'null'  if value is null
     return 'array' if Array.isArray value
 
-    type = switch value.constructor
-      when String   then 'string'
-      when Number   then 'number'
-      when RegExp   then 'regexp'
-      when Function then 'function'
-      when Date     then 'date'
-      else          type
+    type = Object::toString.call(value)
+      .match(/\[object (.+)\]/)[1]
+      .toLowerCase()
   type
 
 #

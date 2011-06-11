@@ -162,33 +162,82 @@ class Flea
       throw new Error 'You must provide string, regexp or function as route src'
 
     if typeof src is 'string'
+      unless options.to?
+        options.to = src.replace /\//g, '#'
+        options.to = options.to.replace /^#+/, ''
+
       src = '/' + src if src[0] isnt '/'
 
-    unless options.to?
-      options.to = src.replace /\//g, '#'
-      options.to = options.to.replace /^#+/, ''
+    route.src = src
 
     unless Object.type(options.to) in ['string', 'function']
       throw new Error 'You must provide valid route destination'
 
-    [route.controller, route.action] = options.to.split '#'
-    unless route.controller?
-      throw new Error 'You must provide valid route controller'
+    if typeof options.to is 'string'
+      [route.controller, route.action] = options.to.split '#'
+      unless route.controller?
+        throw new Error 'You must provide valid route controller'
 
-    route.action ||= 'index'
-    route.src = src
+      route.action ||= 'index'
+    else
+      route.fn = options.to
+
+    if Object.type(options.constraints) is 'object'
+      route.constraints = options.constraints
+
+      for param, constraint of route.constraints
+        unless Object.type(constraint) in ['array', 'regexp']
+          delete route.constraints[param]
+          continue
+
+        continue if Object.type(constraint) is 'array'
+
+        src = constraint.source
+        flags = if constraint.ignoreCase then 'i' else ''
+
+        if src[0] isnt '^'
+          src = '^' + src
+        if src[src.length - 1] isnt '$'
+          src = src + '$'
+
+        unless constraint.source is src
+          route.constraints[param] = new RegExp src, flags
+
+    if Object.type(options.defaults) is 'object'
+      route.defaults = options.defaults
 
     @routes.push route
     #puts route
 
     for method in route.method
-      @app[method].call @app, route.src, (req, res, next) =>
-        @dispatch route, arguments...
+      if typeof route.src is 'function'
+        @app[method] '*', (req, res, next) =>
+          if route.src req
+            @dispatch route, arguments...
+          else
+            next()
+      else
+        @app[method] route.src, (req, res, next) =>
+          @dispatch route, arguments...
 
   #
   # @api: private
   #
   dispatch: (route, req, res, next) ->
+    if route.defaults?
+      for param, value of route.defaults
+        req.params[param] = value if req.params[param] is undefined
+
+    if route.constraints?
+      for param, constraint of route.constraints
+        if Object.type(constraint) is 'array'
+          return next() unless req.params[param] in constraint
+        else
+          return next() unless constraint.test req.params[param]
+
+    if route.fn?
+      return route.fn req, res, next
+
     controller_name = "#{route.controller}_controller".capitalize().camelize()
     if not controller = @controllers[controller_name]
       return next new Error "#{controller_name} not found!"
