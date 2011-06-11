@@ -1,4 +1,5 @@
 * solid router implementation
+* routes middleware
 * postrender handlers
 * socket.io realtime messaging
 * CoffeeScript rendered clientside javascript

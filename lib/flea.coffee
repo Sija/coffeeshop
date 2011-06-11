@@ -68,18 +68,18 @@ Mongoose.model = (name, schema) ->
     already_loaded = loaded_models.reject (model) -> model is name
 
     for dependant in dependant_models
-      if dependant.on.includes(name) and not dependant.satisfied.includes(name)
+      if (name in dependant.on) and not (name in dependant.satisfied)
         dependant.satisfied.push name
 
       for loaded_one in already_loaded
-        if dependant.on.includes(loaded_one) and not dependant.satisfied.includes(loaded_one)
+        if (loaded_one in dependant.on) and not (loaded_one in dependant.satisfied)
           dependant.satisfied.push loaded_one
 
       if dependant.satisfied.length is dependant.on.length and not dependant.loaded
         dependant.loaded = yes
         dependant.callback()
 
-    loaded_models.push name unless loaded_models.includes name
+    loaded_models.push name unless name in loaded_models
 
   model
 
@@ -112,19 +112,20 @@ do ->
 #
 
 class Flea
-  controllers: {}
-  config:
-    session:
-      secret: 'squirrel-octo-cat in the sudden co-attack.!'
-      key: 'sid'
-
-    stylus:
-      src:  __appdir + '/views'
-      dest: __projectdir + '/public'
-      #compress: yes
-      debug: yes
-
   constructor: ->
+    @controllers = {}
+    @routes = []
+    @config =
+      session:
+        secret: 'squirrel-octo-cat in the sudden co-attack.!'
+        key: 'sid'
+
+      stylus:
+        src:  __appdir + '/views'
+        dest: __projectdir + '/public'
+        #compress: yes
+        debug: yes
+
     @load_config()
     @load_models()
 
@@ -132,84 +133,83 @@ class Flea
     @setup_errorhandlers()
 
     #require 'express-namespace'
-    @router_dsl =
-      router:
-        methods: ['del'].merge Express.router.methods
-
-      scope: => @app.namespace arguments...
-      param: => @app.param arguments...
-
-      root: (options) =>
-        @router_dsl.match '/', Object.reverse_merge options, as: 'root'
-
-      match: (src, options) =>
-        route =
-          alias: typeof options.as is 'string' and options.as or null
-          method: ['all']
-
-        if via = options.via
-          via = [via] if typeof via is 'string'
-          if Array.isArray via
-            via = RightJS.$A via.filter (verb) => @router_dsl.router.methods.includes verb
-            via = via.uniq()
-            route.method = via unless via.empty()
-
-        unless Object.type(src) in ['string', 'function', 'regexp']
-          throw new Error 'You must provide string, regexp or function as route src'
-
-        if typeof src is 'string'
-          src = '/' + src if src[0] isnt '/'
-
-          options.to ||= src.replace /\//g, '#'
-          options.to = options.to.replace /^#+/, ''
-
-        unless Object.type(options.to) in ['string', 'function']
-          throw new Error 'You must provide valid route destination'
-
-        [route.controller, route.action] = options.to.split '#'
-
-        if not route.controller?
-          throw new Error 'You must provide valid route controller'
-
-        route.action ||= 'index'
-        route.src = src
-
-        #puts route
-
-        for method in route.method
-          do (method) =>
-            @app[method].call @app, route.src, (req, res, next) =>
-
-              ctrl_name = "#{route.controller}_controller".capitalize().camelize()
-              if not ctrl = @controllers[ctrl_name]
-                next new Error "#{ctrl_name} not found!"
-                return
-
-              req.params.action ||= route.action
-              req.params.action = req.params.action.camelize()
-
-              ctrl = new ctrl req, res
-              ctrl.toString = -> route.controller
-
-              if ctrl.before_filter()?
-                action = req.params.action
-                unless typeof ctrl[action] is 'function'
-                  next new Error "#{route.controller}##{action} is not a controller action!"
-                else
-                  ctrl[action](req, res, next)
-                  ctrl.render() if ctrl.auto_render
-
-                ctrl.after_filter()
-
-              delete ctrl
-
-        @
-
+    @router_methods = ['del'].merge Express.router.methods
 
     @load_routes()
     @load_controllers()
 
     @app.all '*', -> throw new NotFound
+
+  #
+  # @api: private
+  #
+  register_route: (src, options) ->
+    route = {}
+    route.method = ['all']
+
+    if options.as? and typeof options.as is 'string'
+      route.alias = options.as
+
+    if via = options.via
+      via = [via] if typeof via is 'string'
+      if Array.isArray via
+        via = RightJS.$A via # needed 'cause Array objects returned from sandbox are of different parent
+        via = via.filter (verb) => verb in @router_methods
+        via = via.uniq()
+        route.method = via unless via.empty()
+
+    unless Object.type(src) in ['string', 'function', 'regexp']
+      throw new Error 'You must provide string, regexp or function as route src'
+
+    if typeof src is 'string'
+      src = '/' + src if src[0] isnt '/'
+
+    unless options.to?
+      options.to = src.replace /\//g, '#'
+      options.to = options.to.replace /^#+/, ''
+
+    unless Object.type(options.to) in ['string', 'function']
+      throw new Error 'You must provide valid route destination'
+
+    [route.controller, route.action] = options.to.split '#'
+    unless route.controller?
+      throw new Error 'You must provide valid route controller'
+
+    route.action ||= 'index'
+    route.src = src
+
+    @routes.push route
+    #puts route
+
+    for method in route.method
+      @app[method].call @app, route.src, (req, res, next) =>
+        @dispatch route, arguments...
+
+  #
+  # @api: private
+  #
+  dispatch: (route, req, res, next) ->
+    controller_name = "#{route.controller}_controller".capitalize().camelize()
+    if not controller = @controllers[controller_name]
+      return next new Error "#{controller_name} not found!"
+
+    req.params.action ||= route.action
+    req.params.action = req.params.action.camelize()
+
+    controller = new controller req, res
+    controller.template_root = route.controller
+
+    if controller.before_filter()?
+      action = req.params.action
+      unless typeof controller[action] is 'function'
+        next new Error "#{route.controller}##{action} is not a controller action!"
+      else
+        controller[action] req, res, next
+        controller.render() if controller.auto_render
+
+      controller.after_filter()
+
+    delete controller
 
   #
   # @api: private
@@ -249,13 +249,13 @@ class Flea
 
     Utils.runFileInNewContext __appdir + '/models/' + name, sandbox
 
-    schema_name = name.replace /\.(.+)$/, ''
-    schema_name = schema_name.capitalize().camelize()
+    name = name.replace /\.(.+)$/, ''
+    name = name.capitalize().camelize()
 
-    if schema = sandbox[schema_name]
-      Mongoose.model schema_name, schema
+    if schema = sandbox[name]
+      Mongoose.model name, schema
     else
-      console.warn 'Did not find model definition for "%s".', schema_name
+      console.warn 'Did not find model definition for "%s".', name
 
   #
   # @api: private
@@ -280,24 +280,35 @@ class Flea
 
     Utils.runFileInNewContext __appdir + '/controllers/' + name, sandbox
 
-    ctrl_name = name.replace /\.(.+)$/, ''
-    ctrl_name = ctrl_name.capitalize().camelize()
+    name = name.replace /\.(.+)$/, ''
+    name = name.capitalize().camelize()
 
-    if ctrl = sandbox[ctrl_name]
-      @controllers[ctrl_name] = ctrl
+    if controller = sandbox[name]
+      @controllers[name] = controller
     else
-      console.warn 'Did not find controller definition for "%s".', ctrl_name
+      console.warn 'Did not find controller definition for "%s".', name
 
   #
   # @api: private
   #
   load_routes: ->
-    for method in @router_dsl.router.methods
-      do (method) =>
-        @router_dsl[method] = (src, options = {}) =>
-          @router_dsl.match src, Object.merge {}, options, via: method
+    sandbox =
+      app: @app
 
-    sandbox = Object.reverse_merge @router_dsl, app: @app
+      scope: => @app.namespace arguments...
+      param: => @app.param arguments...
+
+      root: (options) =>
+        @register_route '/', Object.reverse_merge options, as: 'root'
+
+      match: (src, options) =>
+        @register_route arguments...
+
+    for method in @router_methods
+      do (method) =>
+        sandbox[method] = (src, options) ->
+          sandbox.match src, Object.merge {}, options, via: method
+
     Utils.runFileInNewContext __projectdir + '/config/routes.coffee', sandbox
 
   #

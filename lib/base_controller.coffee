@@ -1,10 +1,11 @@
 class BaseController
-  request:      null
-  response:     null
-  locals:       {}
-  auto_render:  yes
+  request:        null
+  response:       null
+  template_root:  ''
+  auto_render:    yes
 
   constructor: (@request, @response) ->
+    @locals = {}
 
   local: (key, value) ->
     if typeof key is 'object'
@@ -21,7 +22,8 @@ class BaseController
     [template, options] = [null, template] unless typeof template is 'string'
 
     template ||= @request.params.action.underscored()
-    template = "#{@toString()}/#{template}" unless '/' in template
+    if !!@template_root
+      template = "#{@template_root}/#{template}" unless '/' in template
 
     options ||= {}
     options.locals ||= {}

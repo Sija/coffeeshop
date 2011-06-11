@@ -14,7 +14,7 @@ utils.typeOf = (value) ->
   type = typeof value
   if type is 'object' or type is 'function'
     return 'null'  if value is null
-    return 'array' if value instanceof Array
+    return 'array' if Array.isArray value
 
     type = switch value.constructor
       when String   then 'string'
