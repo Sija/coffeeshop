@@ -87,6 +87,8 @@ Mongoose.model = (name, schema) ->
 # Our shit
 #
 
+Mapper = require 'mapper'
+
 NotFound = require 'error/not_found'
 
 BaseController        = require 'base_controller'
@@ -106,12 +108,15 @@ do ->
     Utils.runFileInNewContext path, sandbox
     ApplicationController = sandbox['ApplicationController']
 
-
 #
 # Main class
 #
 
 class Flea
+
+  #
+  # @api: public
+  #
   constructor: ->
     @controllers = {}
     @routes = []
@@ -132,9 +137,6 @@ class Flea
     @setup_app()
     @setup_errorhandlers()
 
-    #require 'express-namespace'
-    @router_methods = ['del'].merge Express.router.methods
-
     @load_routes()
     @load_controllers()
 
@@ -143,81 +145,16 @@ class Flea
   #
   # @api: private
   #
-  register_route: (src, options) ->
-    route = {}
-    route.method = ['all']
-
-    if options.as? and typeof options.as is 'string'
-      route.alias = options.as
-
-    if via = options.via
-      via = [via] if typeof via is 'string'
-      if Array.isArray via
-        via = RightJS.$A via # needed 'cause Array objects returned from sandbox are of different parent
-        via = via.filter (verb) => verb in @router_methods
-        via = via.uniq()
-        route.method = via unless via.empty()
-
-    unless Object.type(src) in ['string', 'function', 'regexp']
-      throw new Error 'You must provide string, regexp or function as route src'
-
-    if typeof src is 'string'
-      unless options.to?
-        options.to = src.replace /\//g, '#'
-        options.to = options.to.replace /^#+/, ''
-
-      src = '/' + src if src[0] isnt '/'
-
-    route.src = src
-
-    unless Object.type(options.to) in ['string', 'function']
-      throw new Error 'You must provide valid route destination'
-
-    if typeof options.to is 'string'
-      [route.controller, route.action] = options.to.split '#'
-      unless route.controller?
-        throw new Error 'You must provide valid route controller'
-
-      route.action ||= 'index'
-    else
-      route.fn = options.to
-
-    if Object.type(options.constraints) is 'object'
-      route.constraints = options.constraints
-
-      for param, constraint of route.constraints
-        unless Object.type(constraint) in ['array', 'regexp']
-          delete route.constraints[param]
-          continue
-
-        continue if Object.type(constraint) is 'array'
-
-        src = constraint.source
-        flags = if constraint.ignoreCase then 'i' else ''
-
-        if src[0] isnt '^'
-          src = '^' + src
-        if src[src.length - 1] isnt '$'
-          src = src + '$'
-
-        unless constraint.source is src
-          route.constraints[param] = new RegExp src, flags
-
-    if Object.type(options.defaults) is 'object'
-      route.defaults = options.defaults
-
-    @routes.push route
-    #puts route
-
+  register_route: (route) ->
     for method in route.method
-      if typeof route.src is 'function'
+      if typeof route.path is 'function'
         @app[method] '*', (req, res, next) =>
-          if route.src req
+          if route.path req
             @dispatch route, arguments...
           else
             next()
       else
-        @app[method] route.src, (req, res, next) =>
+        @app[method] route.path, (req, res, next) =>
           @dispatch route, arguments...
 
   #
@@ -230,13 +167,13 @@ class Flea
 
     if route.constraints?
       for param, constraint of route.constraints
-        if Object.type(constraint) is 'array'
+        if Array.isArray constraint
           return next() unless req.params[param] in constraint
         else
           return next() unless constraint.test req.params[param]
 
-    if route.fn?
-      return route.fn req, res, next
+    if route.callback?
+      return route.callback req, res, next
 
     controller_name = "#{route.controller}_controller".capitalize().camelize()
     if not controller = @controllers[controller_name]
@@ -251,7 +188,7 @@ class Flea
     if controller.before_filter()?
       action = req.params.action
       unless typeof controller[action] is 'function'
-        next new Error "#{route.controller}##{action} is not a controller action!"
+        next new Error "#{controller_name}##{action} is not a controller action!"
       else
         controller[action] req, res, next
         controller.render() if controller.auto_render
@@ -290,7 +227,7 @@ class Flea
       depends_on: (models, callback) ->
         models = [models] if not Array.isArray models
         dependant =
-          on: RightJS.$A models
+          on: models
           satisfied: []
           callback: callback
           loaded: no
@@ -343,22 +280,17 @@ class Flea
   load_routes: ->
     sandbox =
       app: @app
-
-      scope: => @app.namespace arguments...
       param: => @app.param arguments...
 
-      root: (options) =>
-        @register_route '/', Object.reverse_merge options, as: 'root'
-
-      match: (src, options) =>
-        @register_route arguments...
-
-    for method in @router_methods
+    @mapper = new Mapper
+    for method of @mapper
       do (method) =>
-        sandbox[method] = (src, options) ->
-          sandbox.match src, Object.merge {}, options, via: method
+        sandbox[method] = => @mapper[method] arguments...
 
     Utils.runFileInNewContext __projectdir + '/config/routes.coffee', sandbox
+
+    for route in @mapper.routes
+      @register_route route
 
   #
   # @api: private

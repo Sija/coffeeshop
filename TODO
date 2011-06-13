@@ -1,8 +1,10 @@
 * solid router implementation
+* configurable Express app
+* initializers / bootstrap
 * routes middleware
 * postrender handlers
+* helpers
+* auto matching route params to action arguments
 * socket.io realtime messaging
 * CoffeeScript rendered clientside javascript
-* helpers
-* initializers / bootstrap
 

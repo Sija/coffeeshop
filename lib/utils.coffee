@@ -33,7 +33,7 @@ utils.merge = (target, objects...) ->
     [target, objects] = [this, [target]]
 
   isExtendable = (object) ->
-    !!object and not (typeof object in ['boolean', 'number', 'string'])
+    !!object and typeof object is 'object' and not Array.isArray object
 
   target = {} unless isExtendable target
 
@@ -44,12 +44,7 @@ utils.merge = (target, objects...) ->
 
       if deep and target isnt copy and isExtendable copy
         if src = target[key]
-          if Array.isArray copy
-            clone = Array.isArray(src) and src or []
-            clone.push copy...
-            copy = clone
-          else
-            copy = arguments.callee deep, src, copy
+          copy = arguments.callee deep, {}, src, copy
       target[key] = copy
   target
 
