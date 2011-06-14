@@ -14,7 +14,7 @@ class Mapping
   #
   # @api: public
   #
-  constructor: (@path, @options, @allowed_methods) ->
+  constructor: (@path, @options = {}, @allowed_methods) ->
     @normalize_path()
     @normalize_options()
 
@@ -52,7 +52,9 @@ class Mapping
   # @api: private
   #
   normalize_options: ->
-    if typeof @path is 'string'
+    path_is_string = typeof @path is 'string'
+
+    if path_is_string
       path_without_format = @path.replace /\.:format\??$/, ''
 
       if @using_match_shorthand path_without_format, @options
@@ -67,15 +69,21 @@ class Mapping
     else if @options.to?
       throw new Error "destination must be a string or function, #{Object.type @options.to} given"
 
-    unless @options.controller? || @options.callback
-      throw new Error "controller missing"
-
     unless @options.callback
-      @options.action ||= 'index'
-      ###
-      unless @options.action?
-        throw new Error "action missing"
-      ###
+      if path_is_string and @path.match /:controller/
+        Object.merge @options,
+          constraints:
+            controller: /[a-z][a-z0-9-_]+/i
+      else if not @options.controller?
+        throw new Error "controller missing"
+
+      if path_is_string and @path.match /:action/
+        Object.merge @options,
+          constraints:
+            action: /[a-z][a-z0-9-_]+/i
+      else if not @options.action?
+        #throw new Error "action missing"
+        @options.action = 'index'
 
     if @options.as? and typeof @options.as isnt 'string'
       throw new Error "alias must be a string, #{Object.type @options.as} given"
@@ -160,7 +168,6 @@ class Mapper
       throw error
 
     @routes.push route
-    #puts route
 
   #
   # @api: public

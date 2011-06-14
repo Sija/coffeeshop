@@ -119,7 +119,6 @@ class Flea
   #
   constructor: ->
     @controllers = {}
-    @routes = []
     @config =
       session:
         secret: 'squirrel-octo-cat in the sudden co-attack.!'
@@ -146,8 +145,10 @@ class Flea
   # @api: private
   #
   register_route: (route) ->
+    # needed to make instanceof RegExp work, sandboxing issue again
+    route.path = new RegExp route.path if Object.type(route.path) is 'regexp'
     for method in route.method
-      if typeof route.path is 'function'
+      if Object.type(route.path) is 'function'
         @app[method] '*', (req, res, next) =>
           if route.path req
             @dispatch route, arguments...
@@ -175,7 +176,8 @@ class Flea
     if route.callback?
       return route.callback req, res, next
 
-    controller_name = "#{route.controller}_controller".capitalize().camelize()
+    controller_name = route.controller || req.params.controller
+    controller_name = "#{controller_name}_controller".capitalize().camelize()
     if not controller = @controllers[controller_name]
       return next new Error "#{controller_name} not found!"
 
@@ -284,6 +286,7 @@ class Flea
 
     @mapper = new Mapper
     for method of @mapper
+      continue unless Object.type(@mapper[method]) is 'function'
       do (method) =>
         sandbox[method] = => @mapper[method] arguments...
 
