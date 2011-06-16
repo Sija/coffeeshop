@@ -1,3 +1,3 @@
 
-module.exports = require('./lib/flea');
+module.exports = require('./lib/coffeeshop');
 

@@ -112,7 +112,7 @@ do ->
 # Main class
 #
 
-class Flea
+class CoffeeShop
 
   #
   # @api: public
@@ -364,5 +364,5 @@ class Flea
 # Export ze stuff
 #
 
-module.exports = new Flea
+module.exports = new CoffeeShop
 

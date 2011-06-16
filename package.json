@@ -1,12 +1,12 @@
 {
-  "name":         "flea",
+  "name":         "CoffeeShop",
   "version":      "0.1.0",
-  "description":  "Flea, Express micro framework",
+  "description":  "Coffee powered, Express based framework for Node.js",
   "author":       "Sijawusz Pur Rahnama <sijawusz@gmail.com>",
-  "keywords":     ["coffeescript", "express", "micro", "framework"],
+  "keywords":     ["coffeescript", "express", "framework"],
   "repository":   {
     "type": "git",
-    "url":  "http://github.com/sija/flea.git"
+    "url":  "http://github.com/sija/CoffeeShop.git"
   },
   "dependencies": {
     "express":          ">= 2.0",
