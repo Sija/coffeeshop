@@ -1,6 +1,6 @@
 File    = require 'fs'
 VM      = require 'vm'
-Coffee  = require 'coffee-script'
+Coffee  = null
 
 #
 # @api: public
@@ -20,6 +20,12 @@ utils.typeOf = (value) ->
       .match(/\[object (.+)\]/)[1]
       .toLowerCase()
   type
+
+#
+# @api: public
+#
+utils.classOf = (object) ->
+  object.constructor and object.constructor.name.toLowerCase()
 
 #
 # @api: public
@@ -66,6 +72,7 @@ utils.runFileInNewContext = (filename, sandbox) ->
   run = (filename, sandbox) ->
     code = File.readFileSync filename, 'utf8'
     if filename.match /\.coffee$/
+      Coffee ||= require 'coffee-script'
       code = Coffee.compile code,
         filename: filename
         bare: yes
@@ -74,7 +81,10 @@ utils.runFileInNewContext = (filename, sandbox) ->
       require: require
       console: console
 
-    VM.runInNewContext code, sandbox, filename
+    returnValue = VM.runInNewContext code, sandbox, filename
+    delete sandbox.require
+    delete sandbox.console
+    returnValue
 
   try
     run filename, sandbox

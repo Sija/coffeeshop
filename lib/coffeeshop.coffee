@@ -130,6 +130,12 @@ class CoffeeShop
         #compress: yes
         debug: yes
 
+    @initialize()
+
+  #
+  # @api: public
+  #
+  initialize: ->
     @load_config()
     @load_models()
 
@@ -281,6 +287,8 @@ class CoffeeShop
   #
   load_routes: ->
     sandbox =
+      NotFound: NotFound
+
       app: @app
       param: => @app.param arguments...
 
