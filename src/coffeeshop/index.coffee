@@ -19,12 +19,12 @@ MongooseTypes.loadTypes Mongoose
 # Resolve project and application directory paths
 #
 
-__packagedir = Path.resolve __dirname, '..'
+__packagedir = Path.resolve __dirname, '../..'
 __projectdir = process.cwd()
 __appdir = __projectdir + '/app'
 
-require.paths.unshift __packagedir
 require.paths.unshift __packagedir + '/lib'
+require.paths.unshift __dirname
 
 #
 # Load our internal stuff
@@ -87,17 +87,14 @@ Mongoose.model = (name, schema) ->
 # Our shit
 #
 
-Mapper = require 'mapper'
+Mapper = require 'router/mapper'
 
 NotFound = require 'error/not_found'
 
-BaseController        = require 'base_controller'
-ApplicationController = null
+BaseController        = require 'controller/base'
+ApplicationController = BaseController
 do ->
-  for path in [__appdir + '/controllers', __packagedir + '/lib']
-    path += '/application_controller.coffee'
-
-    continue unless Path.existsSync path
+  try
     sandbox =
       BaseController: BaseController
       NotFound: NotFound
@@ -105,8 +102,9 @@ do ->
       Mongoose: Mongoose
       ObjectId: Mongoose.Schema.Types.ObjectId
 
-    Utils.runFileInNewContext path, sandbox
+    Utils.runFileInNewContext __appdir + '/controllers/application_controller.coffee', sandbox
     ApplicationController = sandbox['ApplicationController']
+  catch e
 
 #
 # Main class
