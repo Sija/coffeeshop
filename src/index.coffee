@@ -1,3 +1,3 @@
 
-module.exports = require './lib/coffeeshop'
+module.exports = require './coffeeshop'
 
