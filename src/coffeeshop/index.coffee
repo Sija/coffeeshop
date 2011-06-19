@@ -111,12 +111,6 @@ class CoffeeShop
         secret: 'squirrel-octo-cat in the sudden co-attack.!'
         key: 'sid'
 
-      stylus:
-        src:  __appdir + '/views'
-        dest: __projectdir + '/public'
-        #compress: yes
-        debug: yes
-
     @initialize()
 
   #
