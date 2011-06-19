@@ -5,7 +5,6 @@
 Express   = require 'express'
 Mongoose  = require 'mongoose'
 Haml      = require 'haml'
-Stylus    = require 'stylus'
 File      = require 'fs'
 Path      = require 'path'
 RightJS   = require 'rightjs'
@@ -87,24 +86,11 @@ Mongoose.model = (name, schema) ->
 # Our shit
 #
 
-Mapper = require 'router/mapper'
-
+Mapper   = require 'router/mapper'
 NotFound = require 'error/not_found'
 
 BaseController        = require 'controller/base'
 ApplicationController = BaseController
-do ->
-  try
-    sandbox =
-      BaseController: BaseController
-      NotFound: NotFound
-
-      Mongoose: Mongoose
-      ObjectId: Mongoose.Schema.Types.ObjectId
-
-    Utils.runFileInNewContext __appdir + '/controllers/application_controller.coffee', sandbox
-    ApplicationController = sandbox['ApplicationController']
-  catch e
 
 #
 # Main class
@@ -115,7 +101,10 @@ class CoffeeShop
   #
   # @api: public
   #
-  constructor: ->
+  constructor: (options) ->
+    @settings = Object.reverse_merge options,
+      default_middleware: yes
+
     @controllers = {}
     @config =
       session:
@@ -141,6 +130,7 @@ class CoffeeShop
     @setup_errorhandlers()
 
     @load_routes()
+    @load_application_controller()
     @load_controllers()
 
     @app.all '*', -> throw new NotFound
@@ -249,6 +239,19 @@ class CoffeeShop
     else
       console.warn 'Did not find model definition for "%s".', name
 
+  load_application_controller: ->
+    try
+      sandbox =
+        BaseController: BaseController
+        NotFound: NotFound
+
+        Mongoose: Mongoose
+        ObjectId: Mongoose.Schema.Types.ObjectId
+
+      Utils.runFileInNewContext __appdir + '/controllers/application_controller.coffee', sandbox
+      ApplicationController = sandbox['ApplicationController']
+    catch e
+
   #
   # @api: private
   #
@@ -314,12 +317,14 @@ class CoffeeShop
       @app.set 'views', __appdir + '/views'
       @app.set 'view engine', 'haml'
 
-      @app.use Stylus.middleware @config.stylus
-      @app.use Express.methodOverride()
-      @app.use Express.bodyParser()
-      @app.use Express.cookieParser()
-      @app.use Express.session @config.session
-      @app.use Express.static __projectdir + '/public'
+      configure @app if configure = @settings.configure
+
+      if @settings.default_middleware
+        @app.use Express.methodOverride()
+        @app.use Express.bodyParser()
+        @app.use Express.cookieParser()
+        @app.use Express.session @config.session
+        @app.use Express.static __projectdir + '/public'
 
     @app.configure 'development', =>
       @app.use Express.errorHandler dumpExceptions: yes, showStack: yes
@@ -370,5 +375,5 @@ class CoffeeShop
 # Export ze stuff
 #
 
-module.exports = new CoffeeShop
+module.exports = CoffeeShop
 
