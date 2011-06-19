@@ -1,8 +1,8 @@
 # shamelessly taken from Zombie
 
-fs            = require('fs')
-path          = require('path')
-{spawn, exec} = require('child_process')
+fs            = require 'fs'
+path          = require 'path'
+{spawn, exec} = require 'child_process'
 stdout        = process.stdout
 
 # Use executables installed with npm bundle.
